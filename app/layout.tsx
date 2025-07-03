@@ -2,12 +2,13 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth';
+import { Navigation } from '@/components/Navigation';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SaaSify AI - No-Code SaaS Builder Platform',
-  description: 'Build, deploy, and monetize SaaS applications without coding. AI-powered drag-and-drop builder with marketplace integration.',
+  title: 'VibeCodersHell - Modern Development Platform',
+  description: 'A modern development platform with clean design and powerful authentication.',
 };
 
 export default function RootLayout({
@@ -19,7 +20,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          {children}
+          <Navigation />
+          <main className="pt-16">
+            {children}
+          </main>
         </AuthProvider>
       </body>
     </html>
