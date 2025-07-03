@@ -1,305 +1,167 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentProfile, Profile } from '@/lib/supabase';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Code2, Users, DollarSign, BarChart3, Settings, Zap, Globe, Brain, Rocket, LogOut } from 'lucide-react';
-import Link from 'next/link';
-import { useAuth } from '@/lib/auth';
-import { getUserApps, App } from '@/lib/supabase';
-import ProtectedRoute from '@/components/ProtectedRoute';
 
-const stats = [
-  {
-    title: "Total Apps",
-    value: "0",
-    change: "Get started",
-    icon: Code2
-  },
-  {
-    title: "Active Users",
-    value: "0",
-    change: "Publish your first app",
-    icon: Users
-  },
-  {
-    title: "Monthly Revenue",
-    value: "$0",
-    change: "Start earning",
-    icon: DollarSign
-  },
-  {
-    title: "Conversion Rate",
-    value: "0%",
-    change: "Track performance",
-    icon: BarChart3
-  }
-];
-
-function DashboardContent() {
-  const { user, profile, signOut } = useAuth();
-  const [userApps, setUserApps] = useState<App[]>([]);
+export default function DashboardPage() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserApps = async () => {
+    const loadProfile = async () => {
       try {
-        const apps = await getUserApps();
-        setUserApps(apps);
+        const userProfile = await getCurrentProfile();
+        if (!userProfile) {
+          router.push('/auth/login');
+          return;
+        }
+        setProfile(userProfile);
       } catch (error) {
-        console.error('Error fetching user apps:', error);
+        console.error('Error loading profile:', error);
+        router.push('/auth/login');
       } finally {
         setLoading(false);
       }
     };
 
-    if (user) {
-      fetchUserApps();
-    }
-  }, [user]);
+    loadProfile();
+  }, [router]);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
 
-  // Update stats based on actual data
-  const updatedStats = [
-    {
-      ...stats[0],
-      value: userApps.length.toString(),
-      change: userApps.length === 0 ? "Create your first app" : `+${userApps.length} total`
-    },
-    ...stats.slice(1)
-  ];
+  if (!profile) {
+    return null; // Will redirect to login
+  }
+
+  const initials = profile.full_name
+    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+    : profile.email[0].toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                SaaSify AI
-              </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-slate-600">
-                Welcome, {profile?.full_name || user?.email}
-              </span>
-              <Badge variant="outline" className="capitalize">
-                {profile?.plan || 'starter'}
-              </Badge>
-              <Button variant="outline" asChild>
-                <Link href="/marketplace">Marketplace</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/builder">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New App
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Dashboard</h1>
-          <p className="text-slate-600">Manage your SaaS applications and track your success</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome to VibeCodersHell
+          </h1>
+          <p className="text-gray-600">
+            {profile.full_name ? `Hello, ${profile.full_name}!` : `Hello, ${profile.email}!`}
+          </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {updatedStats.map((stat) => (
-            <Card key={stat.title} className="border-0 bg-white/60 backdrop-blur-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-slate-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
-                <p className="text-xs text-slate-500 mt-1">{stat.change}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Apps List */}
-          <div className="lg:col-span-2">
-            <Card className="border-0 bg-white/60 backdrop-blur-sm">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Your Applications</CardTitle>
-                    <CardDescription>Manage and monitor your SaaS apps</CardDescription>
+        {/* Profile Card */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={profile.avatar_url || ''} />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-semibold text-gray-900">
+                    {profile.full_name || 'User'}
                   </div>
-                  <Button asChild>
-                    <Link href="/builder">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create New
-                    </Link>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-slate-500 mt-2">Loading your apps...</p>
-                  </div>
-                ) : userApps.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Code2 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">No apps yet</h3>
-                    <p className="text-slate-500 mb-4">Create your first SaaS application to get started</p>
-                    <Button asChild>
-                      <Link href="/builder">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Your First App
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {userApps.map((app) => (
-                      <div key={app.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h3 className="font-semibold text-slate-900">{app.name}</h3>
-                            <p className="text-sm text-slate-600">{app.description || 'No description'}</p>
-                          </div>
-                          <Badge variant={app.status === 'published' ? 'default' : 'secondary'} className="capitalize">
-                            {app.status}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center text-sm text-slate-500">
-                          <div className="flex space-x-4">
-                            <span>Category: {app.category}</span>
-                            <span>Created: {new Date(app.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2 mt-3">
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/builder?app=${app.id}`}>Edit</Link>
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <BarChart3 className="h-3 w-3 mr-1" />
-                            Analytics
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Settings className="h-3 w-3 mr-1" />
-                            Settings
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Actions */}
-            <Card className="border-0 bg-white/60 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full justify-start" variant="outline" asChild>
-                  <Link href="/builder">
-                    <Code2 className="h-4 w-4 mr-2" />
-                    App Builder
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start" variant="outline" asChild>
-                  <Link href="/marketplace">
-                    <Globe className="h-4 w-4 mr-2" />
-                    Browse Marketplace
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <Brain className="h-4 w-4 mr-2" />
-                  AI Features
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <Rocket className="h-4 w-4 mr-2" />
-                  Deploy App
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Account Info */}
-            <Card className="border-0 bg-white/60 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle>Account</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Plan:</span>
-                    <Badge variant="outline" className="capitalize">
-                      {profile?.plan || 'starter'}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Email:</span>
-                    <span className="text-slate-900">{user?.email}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Member since:</span>
-                    <span className="text-slate-900">
-                      {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
-                    </span>
+                  <div className="text-sm text-gray-500">
+                    {profile.email}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Plan:</span>
+                  <Badge variant="secondary" className="capitalize">
+                    {profile.plan}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Member since:</span>
+                  <span className="text-sm text-gray-900">
+                    {new Date(profile.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Upgrade Plan */}
-            <Card className="border-0 bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-              <CardHeader>
-                <CardTitle>Upgrade to Pro</CardTitle>
-                <CardDescription className="text-blue-100">
-                  Unlock advanced features and build unlimited apps
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full bg-white text-blue-600 hover:bg-slate-100">
-                  Upgrade Now
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Quick Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Projects:</span>
+                  <span className="text-sm font-semibold text-gray-900">0</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Templates Used:</span>
+                  <span className="text-sm font-semibold text-gray-900">0</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Last Activity:</span>
+                  <span className="text-sm text-gray-900">Today</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button className="w-full" size="sm">
+                New Project
+              </Button>
+              <Button variant="outline" className="w-full" size="sm">
+                Browse Templates
+              </Button>
+              <Button variant="ghost" className="w-full" size="sm">
+                View Profile
+              </Button>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <div className="text-gray-400 mb-4">
+                <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No activity yet</h3>
+              <p className="text-gray-500 mb-4">
+                Start by creating your first project or browsing our templates.
+              </p>
+              <Button>Get Started</Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  );
-}
-
-export default function Dashboard() {
-  return (
-    <ProtectedRoute>
-      <DashboardContent />
-    </ProtectedRoute>
   );
 }
