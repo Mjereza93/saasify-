@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import Cloudflare from 'cloudflare';
-import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
+// This assumes you have these env vars set up in your .env.local
 const s3Client = new S3Client({
   endpoint: `https://s3.${process.env.B2_REGION}.backblazeb2.com`,
   region: process.env.B2_REGION,
@@ -18,52 +20,61 @@ const cloudflare = new Cloudflare({
 });
 
 export async function POST(request: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get('video') as File;
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const cta_link = formData.get('cta_link') as string;
-    const cta_text = formData.get('cta_text') as string;
-    const userId = formData.get('user_id') as string;
+    const geotag = formData.get('geotag') as string | null; // e.g., '{"city":"New York","lat":40.7128,"lng":-74.0060}'
 
     if (!file) {
       return NextResponse.json({ error: 'No video file provided' }, { status: 400 });
     }
+     if (file.size > 100 * 1024 * 1024) { // 100MB limit
+      return NextResponse.json({ error: 'File size exceeds 100MB' }, { status: 400 });
+    }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const fileName = `${uuidv4()}-${file.name}`;
+    const fileName = `${session.user.id}/${uuidv4()}-${file.name}`;
 
     // 1. Upload to Backblaze B2
-    const putObjectCommand = new PutObjectCommand({
+    await s3Client.send(new PutObjectCommand({
       Bucket: process.env.B2_BUCKET_NAME!,
       Key: fileName,
       Body: fileBuffer,
       ContentType: file.type,
-    });
-
-    await s3Client.send(putObjectCommand);
+    }));
 
     const b2FileUrl = `https://f005.backblazeb2.com/file/${process.env.B2_BUCKET_NAME}/${fileName}`;
 
     // 2. Create video in Cloudflare Stream from URL
     const streamVideo = await cloudflare.stream.videos.create({
       url: b2FileUrl,
-      title,
-      // We can add more options here like watermarks, thumbnails, etc.
+      meta: {
+        title,
+        description,
+        userId: session.user.id,
+      },
+      creator: session.user.id, // Link the video to a creator
     });
 
     // 3. Create ad record in Supabase
     const { data: ad, error } = await supabase
       .from('ads')
       .insert({
-        user_id: userId,
-        video_url: streamVideo.playback.hls,
+        user_id: session.user.id,
+        video_url: streamVideo.uid, // Store the Stream UID instead of the full HLS URL
         thumbnail_url: streamVideo.thumbnail,
         title,
         description,
-        cta_link,
-        cta_text,
+        geotag: geotag ? JSON.parse(geotag) : null,
       })
       .select()
       .single();
