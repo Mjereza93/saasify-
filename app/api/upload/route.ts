@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     const file = formData.get('video') as File;
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const geotag = formData.get('geotag') as string | null; // e.g., '{"city":"New York","lat":40.7128,"lng":-74.0060}'
+    const geotag = formData.get('geotag') as string | null;
+    const floating_cta_config = formData.get('floating_cta_config') as string | null; // JSON string
 
     if (!file) {
       return NextResponse.json({ error: 'No video file provided' }, { status: 400 });
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         geotag: geotag ? JSON.parse(geotag) : null,
+        floating_cta_config: floating_cta_config ? JSON.parse(floating_cta_config) : null,
       })
       .select()
       .single();
